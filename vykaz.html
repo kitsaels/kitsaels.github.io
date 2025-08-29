@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <title>Výkaz práce</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    input[type="time"], input[type="text"] { width: 90%; }
+    tfoot td { font-weight: bold; }
+    .month-selector { margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+    .weekend { background-color: #f5e9e9; }
+    button { padding: 5px 10px; }
+  </style>
+</head>
+<body>
+  <h1>Výkaz práce</h1>
+
+  <div class="month-selector">
+    <button id="prevMonth">◀️</button>
+    <input type="month" id="month" />
+    <button id="nextMonth">▶️</button>
+  </div>
+
+  <table id="workTable">
+    <thead>
+      <tr>
+        <th>Datum</th>
+        <th>Den</th>
+        <th>Od</th>
+        <th>Do</th>
+        <th>Popis práce</th>
+        <th>Hodin</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5">Celkem hodin</td>
+        <td id="totalHours">0</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <script>
+    const monthInput = document.getElementById('month');
+    const tableBody = document.querySelector('#workTable tbody');
+    const totalHoursCell = document.getElementById('totalHours');
+    const prevBtn = document.getElementById('prevMonth');
+    const nextBtn = document.getElementById('nextMonth');
+
+    const dnyTyden = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'];
+
+    monthInput.addEventListener('change', generateTable);
+    prevBtn.addEventListener('click', () => changeMonth(-1));
+    nextBtn.addEventListener('click', () => changeMonth(1));
+
+    function changeMonth(offset) {
+      const [year, month] = monthInput.value.split('-').map(Number);
+      const newDate = new Date(year, month - 1 + offset);
+      const newYear = newDate.getFullYear();
+      const newMonth = String(newDate.getMonth() + 1).padStart(2, '0');
+      monthInput.value = `${newYear}-${newMonth}`;
+      generateTable();
+    }
+
+    function generateTable() {
+      const selectedMonth = monthInput.value;
+      if (!selectedMonth) return;
+
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const savedData = JSON.parse(localStorage.getItem(selectedMonth) || '{}');
+
+      tableBody.innerHTML = '';
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dateObj = new Date(dateStr);
+        const denVtydnu = dnyTyden[dateObj.getDay()];
+        const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+        const rowData = savedData[dateStr] || { from: '', to: '', desc: '' };
+
+        const row = document.createElement('tr');
+        if (isWeekend) row.classList.add('weekend');
+
+        row.innerHTML = `
+          <td>${dateStr}</td>
+          <td>${denVtydnu}</td>
+          <td><input type="time" value="${rowData.from}" data-date="${dateStr}" data-type="from"></td>
+          <td><input type="time" value="${rowData.to}" data-date="${dateStr}" data-type="to"></td>
+          <td><input type="text" value="${rowData.desc}" data-date="${dateStr}" data-type="desc"></td>
+          <td class="hours-cell" id="hours-${dateStr}">0</td>
+        `;
+        tableBody.appendChild(row);
+      }
+
+      tableBody.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', handleInput);
+      });
+
+      updateAllHours();
+    }
+
+    function handleInput(e) {
+      const input = e.target;
+      const date = input.dataset.date;
+      const type = input.dataset.type;
+      const selectedMonth = monthInput.value;
+
+      const data = JSON.parse(localStorage.getItem(selectedMonth) || '{}');
+      data[date] = data[date] || { from: '', to: '', desc: '' };
+      data[date][type] = input.value;
+
+      localStorage.setItem(selectedMonth, JSON.stringify(data));
+
+      updateHoursForDay(date, data[date].from, data[date].to);
+      updateTotalHours();
+    }
+
+    function updateHoursForDay(date, from, to) {
+      const cell = document.getElementById(`hours-${date}`);
+      if (from && to) {
+        const diff = (new Date(`1970-01-01T${to}`) - new Date(`1970-01-01T${from}`)) / 3600000;
+        cell.textContent = diff > 0 ? diff.toFixed(2) : '0';
+      } else {
+        cell.textContent = '0';
+      }
+    }
+
+    function updateAllHours() {
+      const selectedMonth = monthInput.value;
+      const data = JSON.parse(localStorage.getItem(selectedMonth) || '{}');
+      Object.entries(data).forEach(([date, { from, to }]) => {
+        updateHoursForDay(date, from, to);
+      });
+      updateTotalHours();
+    }
+
+    function updateTotalHours() {
+      let total = 0;
+      tableBody.querySelectorAll('.hours-cell').forEach(cell => {
+        total += parseFloat(cell.textContent);
+      });
+      totalHoursCell.textContent = total.toFixed(2);
+    }
+
+    // Nastavit aktuální měsíc po načtení
+    const today = new Date();
+    const initMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    monthInput.value = initMonth;
+    generateTable();
+  </script>
+</body>
+</html>
+
