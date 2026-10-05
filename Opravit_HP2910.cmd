@@ -43,6 +43,14 @@ echo Aktualni tiskarny HP:
 powershell -NoProfile -Command ^
 "Get-Printer | Where-Object { $_.Name -like '*HP*' } | Format-Table Name,PortName,PrinterStatus -AutoSize"
 
+$p = Get-Printer |
+    Where-Object { $_.Name -like '*DeskJet 2900*' } |
+    Select-Object -First 1
+
+if ($p) {
+    (New-Object -ComObject WScript.Network).SetDefaultPrinter($p.Name)
+}
+
 echo.
 echo ==========================================
 echo    Hotovo
